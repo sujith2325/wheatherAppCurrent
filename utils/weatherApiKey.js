@@ -1,0 +1,1 @@
+export const API_KEY = process.env.EXPO_PUBLIC_WEATHER_API_KEY || '1ae31d0140fe4fae96d160556262509';

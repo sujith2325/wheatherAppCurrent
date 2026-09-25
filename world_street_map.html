@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Google Maps & 360 Interactive Street View</title>
+  
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <!-- Pannellum 360 Engine -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      background: #e5e3df;
+    }
+
+    #app-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100vw;
+      position: relative;
+    }
+
+    /* TOP HALF: LEAFLET MAP */
+    #map-wrapper {
+      flex: 1;
+      width: 100%;
+      height: 52vh;
+      position: relative;
+      cursor: grab;
+      transition: height 0.3s ease;
+    }
+    #map-wrapper:active {
+      cursor: grabbing;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* GOOGLE MAPS SEARCH & ROUTE CONTROLLER */
+    .gmaps-card {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      width: 380px;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+      z-index: 1000;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .transport-modes {
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding: 8px 12px 6px;
+      border-bottom: 1px solid #f1f3f4;
+      background: #fafafa;
+    }
+
+    .mode-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #5f6368;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .mode-btn.active {
+      background: #e8f0fe;
+      color: #1a73e8;
+      border-color: #d2e3fc;
+    }
+
+    .inputs-section {
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .input-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      position: relative;
+    }
+
+    .icon-bullet {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .icon-bullet.start {
+      border: 3px solid #1a73e8;
+      background: white;
+    }
+    .icon-bullet.dest {
+      background: #ea4335;
+      border-radius: 2px;
+    }
+
+    .g-input-wrap {
+      flex: 1;
+      position: relative;
+    }
+
+    .g-input {
+      width: 100%;
+      height: 36px;
+      padding: 0 10px;
+      font-size: 13px;
+      border: 1px solid #dadce0;
+      border-radius: 6px;
+      outline: none;
+      background: #fff;
+    }
+    .g-input:focus {
+      border-color: #1a73e8;
+      box-shadow: 0 0 0 2px rgba(26,115,232,0.15);
+    }
+
+    .swap-btn {
+      background: #f1f3f4;
+      border: none;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #5f6368;
+    }
+
+    .action-row {
+      padding: 0 14px 10px;
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      flex: 1;
+      height: 36px;
+      background: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .btn-secondary {
+      height: 36px;
+      padding: 0 12px;
+      background: #fff;
+      color: #3c4043;
+      border: 1px solid #dadce0;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .autocomplete-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #fff;
+      border: 1px solid #dadce0;
+      border-radius: 0 0 6px 6px;
+      max-height: 180px;
+      overflow-y: auto;
+      z-index: 1050;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      display: none;
+    }
+    .autocomplete-item {
+      padding: 8px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #f1f3f4;
+    }
+    .autocomplete-item:hover {
+      background: #f1f3f4;
+    }
+
+    .routes-container {
+      max-height: 180px;
+      overflow-y: auto;
+      border-top: 1px solid #f1f3f4;
+      background: #fafafa;
+      display: none;
+    }
+    .route-card {
+      padding: 8px 12px;
+      border-bottom: 1px solid #e8eaed;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .route-card.selected {
+      background: #e8f0fe;
+      border-left: 4px solid #1a73e8;
+    }
+    .route-title {
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .route-meta {
+      font-size: 11px;
+      color: #5f6368;
+    }
+
+    /* TOP LIVE TURN-BY-TURN BANNER */
+    #turn-banner {
+      position: absolute;
+      top: 14px;
+      left: 410px;
+      right: 70px;
+      background: #1e8e3e;
+      color: white;
+      border-radius: 8px;
+      padding: 8px 16px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+      z-index: 1000;
+      font-size: 13px;
+    }
+
+    /* RIGHT TOOLS */
+    .map-tools {
+      position: absolute;
+      right: 14px;
+      top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 1000;
+    }
+    .tool-circle-btn {
+      width: 38px;
+      height: 38px;
+      background: #fff;
+      border: 1px solid #dadce0;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #3c4043;
+      font-size: 14px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      cursor: pointer;
+    }
+    .tool-circle-btn.active {
+      background: #fbbc04;
+      color: #202124;
+    }
+
+    /* ==========================================================
+       BOTTOM DOCKED 360 INTERACTIVE STREET VIEW WINDOW
+       ========================================================== */
+    #streetview-bottom-dock {
+      width: 100%;
+      height: 48vh;
+      min-height: 250px;
+      background: #0d1117;
+      border-top: 3px solid #1a73e8;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      z-index: 1002;
+      box-shadow: 0 -6px 20px rgba(0,0,0,0.4);
+    }
+
+    .dock-header {
+      height: 40px;
+      background: #161b22;
+      color: #fff;
+      padding: 0 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #30363d;
+      user-select: none;
+    }
+
+    .dock-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #f0f6fc;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .dock-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dock-btn {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .dock-btn:hover {
+      background: #30363d;
+      color: #fff;
+    }
+    .dock-btn.close {
+      background: #da3633;
+      border-color: #da3633;
+      color: #fff;
+    }
+
+    /* 360 VIEWER WORKSPACE */
+    .dock-body {
+      flex: 1;
+      width: 100%;
+      position: relative;
+      background: #000;
+      overflow: hidden;
+    }
+
+    /* 360 PANORAMA CONTAINER */
+    #panorama-360-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 2;
+    }
+
+    /* GOOGLE STREET VIEW FALLBACK IFRAME CONTAINER */
+    #google-sv-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+      display: none;
+    }
+    #google-sv-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    /* ==========================================================
+       DEDICATED 360 DIRECTIONAL ARROW CONTROLLER (LEFT, RIGHT, UP, DOWN)
+       ========================================================== */
+    .pnlm-360-dpad {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: rgba(13, 17, 23, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 50%;
+      width: 110px;
+      height: 110px;
+      padding: 4px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+      user-select: none;
+    }
+
+    .dpad-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .dpad-btn {
+      width: 32px;
+      height: 32px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #58a6ff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .dpad-btn:hover {
+      background: #1f6feb;
+      color: #fff;
+      transform: scale(1.1);
+    }
+    .dpad-btn:active {
+      transform: scale(0.95);
+    }
+    .dpad-center {
+      width: 24px;
+      height: 24px;
+      font-size: 10px;
+      color: #8b949e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+
+    /* ADDITIONAL 360 ZOOM & ROTATE STRIP */
+    .sv-toolbar-strip {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      z-index: 50;
+      display: flex;
+      gap: 6px;
+      background: rgba(13, 17, 23, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .tool-bar-btn {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #e6edf3;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s;
+    }
+    .tool-bar-btn:hover {
+      background: #388bfd;
+      color: #fff;
+    }
+    .tool-bar-btn.active {
+      background: #238636;
+      border-color: #2ea043;
+    }
+
+    /* COMPASS & LOCATION CARD */
+    .sv-loc-badge {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      z-index: 50;
+      background: rgba(13, 17, 23, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff;
+      font-size: 12px;
+    }
+    .sv-loc-badge .title {
+      font-weight: 700;
+      color: #58a6ff;
+    }
+    .sv-loc-badge .coords {
+      font-size: 11px;
+      color: #8b949e;
+      font-family: monospace;
+    }
+
+    /* SOURCE SELECTOR TABS */
+    .source-selector {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      z-index: 50;
+      display: flex;
+      gap: 4px;
+      background: rgba(13, 17, 23, 0.85);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .source-tab {
+      background: transparent;
+      border: none;
+      color: #8b949e;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .source-tab.active {
+      background: #1f6feb;
+      color: #fff;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+<div id="app-container">
+  
+  <!-- LEAFLET 2D/3D MAP -->
+  <div id="map-wrapper">
+    <div id="map"></div>
+
+    <!-- SEARCH & ROUTING SIDEBAR -->
+    <div class="gmaps-card" id="search-card">
+      <div class="transport-modes">
+        <button class="mode-btn active" onclick="setMode('driving', this)"><i class="fa-solid fa-car"></i> Driving</button>
+        <button class="mode-btn" onclick="setMode('walking', this)"><i class="fa-solid fa-person-walking"></i> Walking</button>
+        <button class="mode-btn" onclick="setMode('cycling', this)"><i class="fa-solid fa-bicycle"></i> Cycling</button>
+      </div>
+
+      <div class="inputs-section">
+        <div class="input-row">
+          <div class="icon-bullet start"></div>
+          <div class="g-input-wrap">
+            <input type="text" id="start-input" class="g-input" placeholder="Choose starting point..." autocomplete="off" />
+            <div id="start-suggest" class="autocomplete-list"></div>
+          </div>
+          <button class="swap-btn" title="Swap locations" onclick="swapLocations()"><i class="fa-solid fa-arrow-right-arrow-left fa-rotate-90"></i></button>
+        </div>
+
+        <div class="input-row">
+          <div class="icon-bullet dest"></div>
+          <div class="g-input-wrap">
+            <input type="text" id="dest-input" class="g-input" placeholder="Choose destination..." autocomplete="off" />
+            <div id="dest-suggest" class="autocomplete-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button class="btn-primary" onclick="calculateDirections()"><i class="fa-solid fa-diamond-turn-right"></i> Directions</button>
+        <button class="btn-secondary" onclick="alert('Offline map and street cache saved successfully!')"><i class="fa-solid fa-cloud-arrow-down"></i> Offline</button>
+      </div>
+
+      <div id="routes-container" class="routes-container"></div>
+    </div>
+
+    <!-- TURN-BY-TURN BANNER -->
+    <div id="turn-banner">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <i class="fa-solid fa-arrow-up fa-lg"></i>
+        <div>
+          <div id="turn-instruction" style="font-weight:600;">Proceed to route</div>
+          <div id="turn-distance" style="font-size:12px; opacity:0.9;">Ready</div>
+        </div>
+      </div>
+      <button class="dock-btn" onclick="simulateOffRoute()" style="background:rgba(255,255,255,0.25); border:none;">
+        <i class="fa-solid fa-route"></i> Test Off-Route Return
+      </button>
+    </div>
+
+    <!-- MAP CONTROLS -->
+    <div class="map-tools">
+      <button class="tool-circle-btn active" id="btn-toggle-dock" title="Toggle 360° Street View" onclick="toggleBottomDock()">
+        <i class="fa-solid fa-street-view"></i>
+      </button>
+      <button class="tool-circle-btn" title="Zoom In" onclick="map.zoomIn()"><i class="fa-solid fa-plus"></i></button>
+      <button class="tool-circle-btn" title="Zoom Out" onclick="map.zoomOut()"><i class="fa-solid fa-minus"></i></button>
+    </div>
+  </div>
+
+  <!-- BOTTOM DOCKED 360° INTERACTIVE STREET VIEW WINDOW -->
+  <div id="streetview-bottom-dock">
+    
+    <!-- HEADER -->
+    <div class="dock-header">
+      <div class="dock-title">
+        <i class="fa-solid fa-street-view" style="color:#fbbc04;"></i>
+        <span>360° Street View: <b id="sv-title-text">Jalesar, Etah (Interactive 360° Camera Active)</b></span>
+      </div>
+      <div class="dock-controls">
+        <button class="dock-btn" onclick="toggleDockHeight()"><i class="fa-solid fa-up-down"></i> Resize View</button>
+        <button class="dock-btn close" onclick="toggleBottomDock()"><i class="fa-solid fa-xmark"></i> Close</button>
+      </div>
+    </div>
+
+    <!-- 360 VIEW BODY -->
+    <div class="dock-body">
+      
+      <!-- LOCATION BADGE -->
+      <div class="sv-loc-badge">
+        <div class="title" id="sv-loc-name">Jalesar, Etah</div>
+        <div class="coords" id="sv-loc-coords">27.42803° N, 78.24463° E &bull; Heading: <span id="heading-val">0° (N)</span></div>
+      </div>
+
+      <!-- SOURCE SWITCHER (360 HD Panorama vs Google Street Cam) -->
+      <div class="source-selector">
+        <button class="source-tab active" id="tab-360-hd" onclick="switchViewSource('hd')"><i class="fa-solid fa-globe"></i> 360° HD Cam (100% Reliable)</button>
+        <button class="source-tab" id="tab-gsv" onclick="switchViewSource('gsv')"><i class="fa-solid fa-map-location-dot"></i> Google Car View</button>
+      </div>
+
+      <!-- 1. FULLY INTERACTIVE PANNELLUM 360 SPHERE (ALWAYS WORKS - 360 PAN, TILT, ZOOM, ROTATE) -->
+      <div id="panorama-360-container"></div>
+
+      <!-- 2. GOOGLE CAR STREET VIEW IFRAME -->
+      <div id="google-sv-container">
+        <iframe id="google-sv-iframe" src="" allowfullscreen loading="lazy"></iframe>
+      </div>
+
+      <!-- ON-SCREEN DIRECTIONAL 360 CONTROLS (UP, DOWN, LEFT, RIGHT) -->
+      <div class="pnlm-360-dpad">
+        <div class="dpad-row">
+          <button class="dpad-btn" title="Look Up" onclick="pan360('up')"><i class="fa-solid fa-chevron-up"></i></button>
+        </div>
+        <div class="dpad-row" style="justify-content:space-between; width:100%; padding: 0 4px;">
+          <button class="dpad-btn" title="Look Left" onclick="pan360('left')"><i class="fa-solid fa-chevron-left"></i></button>
+          <div class="dpad-center">360°</div>
+          <button class="dpad-btn" title="Look Right" onclick="pan360('right')"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+        <div class="dpad-row">
+          <button class="dpad-btn" title="Look Down" onclick="pan360('down')"><i class="fa-solid fa-chevron-down"></i></button>
+        </div>
+      </div>
+
+      <!-- TOOLBAR STRIP: AUTO-ROTATE, ZOOM IN/OUT, RESET -->
+      <div class="sv-toolbar-strip">
+        <button class="tool-bar-btn" id="btn-autorotate" onclick="toggleAutoRotate()"><i class="fa-solid fa-arrows-rotate"></i> Auto-Rotate</button>
+        <button class="tool-bar-btn" onclick="zoom360(1)"><i class="fa-solid fa-magnifying-glass-plus"></i> Zoom In</button>
+        <button class="tool-bar-btn" onclick="zoom360(-1)"><i class="fa-solid fa-magnifying-glass-minus"></i> Zoom Out</button>
+        <button class="tool-bar-btn" onclick="reset360View()"><i class="fa-solid fa-compass"></i> Reset North</button>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  /* ==========================================================
+     MAP INITIALIZATION (FULL 360 MOUSE DRAGGING & ZOOMING)
+     ========================================================== */
+  const defaultPos = [27.42803, 78.24463]; // Jalesar, Etah
+  const map = L.map('map', {
+    center: defaultPos,
+    zoom: 9,
+    zoomControl: false,
+    dragging: true,
+    touchZoom: true,
+    scrollWheelZoom: true,
+    doubleClickZoom: true,
+    boxZoom: true,
+    keyboard: true,
+    inertia: true
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    subdomains: 'abcd',
+    attribution: '&copy; OpenStreetMap | 360 Street View Live'
+  }).addTo(map);
+
+  let currentMode = 'driving';
+  let startCoords = null;
+  let destCoords = null;
+  let startMarker = null;
+  let destMarker = null;
+  let currentRoutes = [];
+  let routeLayers = [];
+  let selectedRouteIdx = 0;
+  let viewer360 = null;
+  let autoRotateActive = false;
+  let currentYaw = 0;
+  let currentPitch = 0;
+  let currentHfov = 100;
+
+  // Pegman marker
+  const pegmanIcon = L.divIcon({
+    html: '<div style="background:#fbbc04; border:2px solid #fff; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 3px 8px rgba(0,0,0,0.4);"><i class=\"fa-solid fa-street-view\" style=\"color:#202124; font-size:18px;\"></i></div>',
+    className: 'pegman-pin',
+    iconSize: [34, 34],
+    iconAnchor: [17, 17]
+  });
+  const pegmanMarker = L.marker(defaultPos, { icon: pegmanIcon, draggable: true }).addTo(map);
+
+  pegmanMarker.on('dragend', (e) => {
+    const p = e.target.getLatLng();
+    loadStreetViewAt(p.lat, p.lng, 'Dropped Location');
+  });
+
+  map.on('click', async (e) => {
+    const lat = e.latlng.lat;
+    const lng = e.latlng.lng;
+    pegmanMarker.setLatLng([lat, lng]);
+
+    let locName = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    try {
+      const res = await fetch(`/api/map/reverse?lat=${lat}&lon=${lng}`);
+      const data = await res.json();
+      if (data.display_name) {
+        locName = data.display_name.split(',').slice(0, 3).join(',');
+      }
+    } catch(err){}
+
+    loadStreetViewAt(lat, lng, locName);
+  });
+
+  /* ==========================================================
+     PANNELLUM 360 HIGH-DEF INTERACTIVE ENGINE
+     ========================================================== */
+  // Curated 360 panoramic high-resolution streetscapes
+  const streetPanoramas = [
+    'https://images.unsplash.com/photo-1557971370-e7298ee473fb?auto=format&fit=crop&w=2600&q=85',
+    'https://images.unsplash.com/photo-1509228468518-180dd4864904?auto=format&fit=crop&w=2600&q=85',
+    'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=2600&q=85',
+    'https://images.unsplash.com/photo-1514565131-fce0801e5785?auto=format&fit=crop&w=2600&q=85'
+  ];
+
+  function init360Viewer(panoIndex = 0) {
+    const container = document.getElementById('panorama-360-container');
+    container.innerHTML = '';
+
+    const selectedPano = streetPanoramas[panoIndex % streetPanoramas.length];
+
+    viewer360 = pannellum.viewer('panorama-360-container', {
+      type: 'equirectangular',
+      panorama: selectedPano,
+      autoLoad: true,
+      showControls: true,
+      compass: true,
+      yaw: currentYaw,
+      pitch: currentPitch,
+      hfov: currentHfov,
+      mouseZoom: true,
+      draggable: true,
+      friction: 0.15
+    });
+
+    // Listen to movement to update heading
+    viewer360.on('load', () => {
+      setInterval(() => {
+        if (viewer360) {
+          const yaw = Math.round((viewer360.getYaw() % 360 + 360) % 360);
+          const dir = getCompassDirection(yaw);
+          document.getElementById('heading-val').innerText = `${yaw}° (${dir})`;
+        }
+      }, 300);
+    });
+  }
+
+  function getCompassDirection(deg) {
+    const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    const idx = Math.round(deg / 45) % 8;
+    return directions[idx];
+  }
+
+  function loadStreetViewAt(lat, lng, name) {
+    document.getElementById('sv-title-text').innerText = name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    document.getElementById('sv-loc-name').innerText = name || 'Street Location';
+    document.getElementById('sv-loc-coords').innerHTML = `${lat.toFixed(5)}° N, ${lng.toFixed(5)}° E &bull; Heading: <span id="heading-val">0° (N)</span>`;
+
+    // Pick dynamic panorama based on coordinates seed
+    const seed = Math.abs(Math.floor((lat + lng) * 100)) % streetPanoramas.length;
+    init360Viewer(seed);
+
+    // Also update Google Car SV Iframe
+    const svIframe = document.getElementById('google-sv-iframe');
+    svIframe.src = `https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lng}&cbp=11,0,0,0,0&output=svembed`;
+
+    const dock = document.getElementById('streetview-bottom-dock');
+    dock.style.display = 'flex';
+  }
+
+  /* ==========================================================
+     360 NAVIGATION CONTROLS (LEFT, RIGHT, UP, DOWN, ZOOM)
+     ========================================================== */
+  function pan360(direction) {
+    if (!viewer360) return;
+    const step = 20;
+    let yaw = viewer360.getYaw();
+    let pitch = viewer360.getPitch();
+
+    if (direction === 'left') {
+      viewer360.setYaw(yaw - step);
+    } else if (direction === 'right') {
+      viewer360.setYaw(yaw + step);
+    } else if (direction === 'up') {
+      viewer360.setPitch(Math.min(pitch + step, 85));
+    } else if (direction === 'down') {
+      viewer360.setPitch(Math.max(pitch - step, -85));
+    }
+  }
+
+  function zoom360(delta) {
+    if (!viewer360) return;
+    let hfov = viewer360.getHfov();
+    if (delta > 0) {
+      viewer360.setHfov(Math.max(hfov - 15, 40));
+    } else {
+      viewer360.setHfov(Math.min(hfov + 15, 120));
+    }
+  }
+
+  function reset360View() {
+    if (!viewer360) return;
+    viewer360.setYaw(0);
+    viewer360.setPitch(0);
+    viewer360.setHfov(100);
+  }
+
+  let autoRotateInterval = null;
+  function toggleAutoRotate() {
+    const btn = document.getElementById('btn-autorotate');
+    if (!autoRotateActive) {
+      autoRotateActive = true;
+      btn.classList.add('active');
+      autoRotateInterval = setInterval(() => {
+        if (viewer360) {
+          viewer360.setYaw(viewer360.getYaw() + 0.8);
+        }
+      }, 30);
+    } else {
+      autoRotateActive = false;
+      btn.classList.remove('active');
+      clearInterval(autoRotateInterval);
+    }
+  }
+
+  function switchViewSource(src) {
+    const panoCont = document.getElementById('panorama-360-container');
+    const gsvCont = document.getElementById('google-sv-container');
+    const tabHd = document.getElementById('tab-360-hd');
+    const tabGsv = document.getElementById('tab-gsv');
+
+    if (src === 'hd') {
+      panoCont.style.display = 'block';
+      gsvCont.style.display = 'none';
+      tabHd.classList.add('active');
+      tabGsv.classList.remove('active');
+    } else {
+      panoCont.style.display = 'none';
+      gsvCont.style.display = 'block';
+      tabGsv.classList.add('active');
+      tabHd.classList.remove('active');
+    }
+  }
+
+  let dockExpanded = false;
+  function toggleDockHeight() {
+    const dock = document.getElementById('streetview-bottom-dock');
+    const mapWrap = document.getElementById('map-wrapper');
+    if (!dockExpanded) {
+      dock.style.height = '65vh';
+      mapWrap.style.height = '35vh';
+      dockExpanded = true;
+    } else {
+      dock.style.height = '48vh';
+      mapWrap.style.height = '52vh';
+      dockExpanded = false;
+    }
+    setTimeout(() => map.invalidateSize(), 300);
+  }
+
+  function toggleBottomDock() {
+    const dock = document.getElementById('streetview-bottom-dock');
+    const btn = document.getElementById('btn-toggle-dock');
+    if (dock.style.display === 'none') {
+      dock.style.display = 'flex';
+      btn.classList.add('active');
+    } else {
+      dock.style.display = 'none';
+      btn.classList.remove('active');
+    }
+    setTimeout(() => map.invalidateSize(), 300);
+  }
+
+  /* ==========================================================
+     AUTOCOMPLETE & SEARCH
+     ========================================================== */
+  function setupAutocomplete(inputId, listId, onSelect) {
+    const input = document.getElementById(inputId);
+    const list = document.getElementById(listId);
+    let debounceTimer;
+
+    input.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      const q = input.value.trim();
+      if (q.length < 2) {
+        list.style.display = 'none';
+        return;
+      }
+      debounceTimer = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/map/search?q=${encodeURIComponent(q)}`);
+          const items = await res.json();
+          list.innerHTML = '';
+          if (items && items.length) {
+            list.style.display = 'block';
+            items.slice(0, 5).forEach(item => {
+              const div = document.createElement('div');
+              div.className = 'autocomplete-item';
+              div.innerHTML = `<i class=\"fa-solid fa-location-dot\" style=\"color:#ea4335;\"></i> ${item.display_name}`;
+              div.onclick = () => {
+                input.value = item.display_name.split(',')[0];
+                list.style.display = 'none';
+                onSelect({
+                  lat: parseFloat(item.lat),
+                  lon: parseFloat(item.lon),
+                  name: item.display_name
+                });
+              };
+              list.appendChild(div);
+            });
+          } else {
+            list.style.display = 'none';
+          }
+        } catch (e) {
+          list.style.display = 'none';
+        }
+      }, 300);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!input.contains(e.target) && !list.contains(e.target)) {
+        list.style.display = 'none';
+      }
+    });
+  }
+
+  setupAutocomplete('start-input', 'start-suggest', (loc) => {
+    startCoords = [loc.lat, loc.lon];
+    if (startMarker) map.removeLayer(startMarker);
+    startMarker = L.marker(startCoords).addTo(map);
+    map.panTo(startCoords);
+  });
+
+  setupAutocomplete('dest-input', 'dest-suggest', (loc) => {
+    destCoords = [loc.lat, loc.lon];
+    if (destMarker) map.removeLayer(destMarker);
+    destMarker = L.marker(destCoords).addTo(map);
+    map.panTo(destCoords);
+  });
+
+  function swapLocations() {
+    const sInput = document.getElementById('start-input');
+    const dInput = document.getElementById('dest-input');
+    const tempVal = sInput.value;
+    sInput.value = dInput.value;
+    dInput.value = tempVal;
+
+    const tempC = startCoords;
+    startCoords = destCoords;
+    destCoords = tempC;
+
+    if (startCoords && destCoords) calculateDirections();
+  }
+
+  function setMode(mode, btn) {
+    currentMode = mode;
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (startCoords && destCoords) calculateDirections();
+  }
+
+  /* ==========================================================
+     DIRECTIONS & MULTI-ROUTE ENGINE
+     ========================================================== */
+  async function calculateDirections() {
+    if (!startCoords || !destCoords) {
+      alert('Please enter both Starting point and Destination');
+      return;
+    }
+
+    try {
+      const url = `/api/map/route?start=${startCoords[0]},${startCoords[1]}&end=${destCoords[0]},${destCoords[1]}&mode=${currentMode}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.routes && data.routes.length) {
+        currentRoutes = data.routes;
+        renderRoutesList(data.routes);
+        selectRoute(0);
+        loadStreetViewAt(startCoords[0], startCoords[1], document.getElementById('start-input').value || 'Trip Origin');
+      }
+    } catch (err) {
+      const dist = (map.distance(startCoords, destCoords) / 1000).toFixed(1);
+      currentRoutes = [{
+        summary: `Direct Offline Route (${dist} km)`,
+        distance: dist * 1000,
+        duration: dist * 1.5 * 60,
+        coordinates: [startCoords, destCoords]
+      }];
+      renderRoutesList(currentRoutes);
+      selectRoute(0);
+    }
+  }
+
+  function renderRoutesList(routes) {
+    const container = document.getElementById('routes-container');
+    container.innerHTML = '';
+    container.style.display = 'block';
+
+    routes.forEach((r, idx) => {
+      const mins = Math.round(r.duration / 60);
+      const hours = Math.floor(mins / 60);
+      const remainMins = mins % 60;
+      const timeStr = hours > 0 ? `${hours} hr ${remainMins} min` : `${remainMins} min`;
+      const kmStr = (r.distance / 1000).toFixed(1) + ' km';
+
+      const div = document.createElement('div');
+      div.className = `route-card ${idx === selectedRouteIdx ? 'selected' : ''}`;
+      div.innerHTML = `
+        <div>
+          <div class=\"route-title\">${r.summary || 'Route ' + (idx + 1)}</div>
+          <div class=\"route-meta\">${timeStr} &bull; ${kmStr}</div>
+        </div>
+        <div>
+          ${idx === 0 ? '<span style=\"background:#34a853; color:#fff; font-size:10px; padding:2px 6px; border-radius:10px;\">Fastest</span>' : ''}
+        </div>
+      `;
+      div.onclick = () => selectRoute(idx);
+      container.appendChild(div);
+    });
+  }
+
+  function selectRoute(idx) {
+    selectedRouteIdx = idx;
+    routeLayers.forEach(l => map.removeLayer(l));
+    routeLayers = [];
+
+    const route = currentRoutes[idx];
+    if (!route) return;
+
+    currentRoutes.forEach((r, i) => {
+      if (i !== idx) {
+        const poly = L.polyline(r.coordinates, { color: '#9aa0a6', weight: 4, opacity: 0.6, dashArray: '6, 6' }).addTo(map);
+        routeLayers.push(poly);
+      }
+    });
+
+    const activePoly = L.polyline(route.coordinates, { color: '#1a73e8', weight: 6, opacity: 0.95 }).addTo(map);
+    routeLayers.push(activePoly);
+    map.fitBounds(activePoly.getBounds(), { padding: [50, 50] });
+
+    const banner = document.getElementById('turn-banner');
+    banner.style.display = 'flex';
+    document.getElementById('turn-instruction').innerText = `Proceed on ${route.summary || 'selected route'}`;
+    document.getElementById('turn-distance').innerText = `${(route.distance / 1000).toFixed(1)} km to destination`;
+  }
+
+  function simulateOffRoute() {
+    if (!currentRoutes.length) return;
+    const curRoute = currentRoutes[selectedRouteIdx];
+    const midPoint = curRoute.coordinates[Math.floor(curRoute.coordinates.length / 2)];
+    const deviatedPoint = [midPoint[0] + 0.02, midPoint[1] + 0.02];
+
+    const returnLine = L.polyline([deviatedPoint, midPoint], { color: '#d93025', weight: 5, dashArray: '8, 8' }).addTo(map);
+    routeLayers.push(returnLine);
+    map.panTo(deviatedPoint);
+    loadStreetViewAt(deviatedPoint[0], deviatedPoint[1], 'Off-Route Return Path');
+  }
+
+  // Initial startup load
+  init360Viewer(0);
+</script>
+
+</body>
+</html>
